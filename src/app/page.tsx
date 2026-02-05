@@ -54,23 +54,23 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen sm:h-screen min-h-[100dvh] w-screen flex flex-col bg-slate-950 gradient-bg tactical-grid overflow-hidden">
+    <div className="h-screen sm:h-screen min-h-[100dvh] w-screen flex flex-col bg-white gradient-bg tactical-grid overflow-hidden">
       {/* Status Bar */}
       <StatusBar activeRegions={activeRegions} uplink="ONLINE" />
 
       {/* Main Content - stacked on mobile, side-by-side on desktop */}
       <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
         {/* Left Panel - News Feed */}
-        <div className={`h-[20dvh] sm:h-full flex-shrink-0 flex flex-col border-b sm:border-b-0 sm:border-r border-slate-800/50 premium-card sm:corner-brackets sm:breathe-glow overflow-hidden sm:order-1 order-2 transition-all duration-300 ${hiddenPanels.has('intel') ? 'sm:w-[40px]' : layout === 'feed' ? 'sm:w-[500px]' : layout === 'globe' ? 'sm:w-[200px]' : 'sm:w-[320px]'}`}>
+        <div className={`h-[20dvh] sm:h-full flex-shrink-0 flex flex-col border-b sm:border-b-0 sm:border-r border-slate-200 premium-card sm:corner-brackets sm:breathe-glow overflow-hidden sm:order-1 order-2 transition-all duration-300 ${hiddenPanels.has('intel') ? 'sm:w-[40px]' : layout === 'feed' ? 'sm:w-[500px]' : layout === 'globe' ? 'sm:w-[200px]' : 'sm:w-[320px]'}`}>
           {/* Panel Header */}
-          <div className="hidden sm:flex h-6 bg-slate-900/80 border-b border-slate-700/50 items-center justify-between px-2 flex-shrink-0">
+          <div className="hidden sm:flex h-6 bg-slate-50/80 border-b border-slate-200 items-center justify-between px-2 flex-shrink-0">
             {!hiddenPanels.has('intel') && (
-              <span className="text-amber-400 text-[9px] font-bold tracking-widest">INTEL FEED</span>
+              <span className="text-amber-600 text-[9px] font-bold tracking-widest">INTEL FEED</span>
             )}
             <div className="flex items-center gap-1 ml-auto">
               <button
                 onClick={() => togglePanel('intel')}
-                className="p-0.5 hover:bg-slate-700/50 rounded transition-colors"
+                className="p-0.5 hover:bg-slate-100 rounded transition-colors"
                 title={hiddenPanels.has('intel') ? 'Expand panel' : 'Collapse panel'}
               >
                 {hiddenPanels.has('intel') ? (
@@ -89,7 +89,7 @@ export default function Home() {
           )}
           {hiddenPanels.has('intel') && (
             <div className="flex-1 flex items-center justify-center">
-              <span className="text-amber-400 text-[9px] font-bold tracking-widest writing-mode-vertical rotate-180" style={{ writingMode: 'vertical-rl' }}>INTEL</span>
+              <span className="text-amber-600 text-[9px] font-bold tracking-widest writing-mode-vertical rotate-180" style={{ writingMode: 'vertical-rl' }}>INTEL</span>
             </div>
           )}
         </div>
@@ -97,25 +97,25 @@ export default function Home() {
         {/* Center Panel - Globe & Map */}
         <div className="h-[25dvh] sm:h-full sm:flex-1 flex flex-col sm:min-w-[400px] sm:order-2 order-1">
           {/* Panel Header */}
-          <div className="hidden sm:flex h-6 bg-slate-900/80 border-b border-slate-700/50 items-center justify-between px-2 flex-shrink-0">
-            <span className="text-emerald-400 text-[9px] font-bold tracking-widest">GLOBAL SITUATIONAL AWARENESS</span>
+          <div className="hidden sm:flex h-6 bg-slate-50/80 border-b border-slate-200 items-center justify-between px-2 flex-shrink-0">
+            <span className="text-emerald-600 text-[9px] font-bold tracking-widest">GLOBAL SITUATIONAL AWARENESS</span>
             <div className="flex items-center gap-1">
               <PopoutButton panel="globe" />
             </div>
           </div>
           {/* Globe Area */}
-          <div className="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
+          <div className="flex-1 relative bg-white flex items-center justify-center overflow-hidden">
             <Globe hotspots={hotspots} onHotspotClick={handleHotspotClick} />
 
             {/* Live indicator */}
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10 bg-slate-900/90 px-3 py-1 rounded border border-emerald-500/30 border-glow">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full live-indicator" />
-              <span className="text-emerald-400 text-[8px] font-bold tracking-widest glow-text">LIVE</span>
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10 bg-white/90 px-3 py-1 rounded border border-emerald-600/30 border-glow">
+              <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full live-indicator" />
+              <span className="text-emerald-600 text-[8px] font-bold tracking-widest glow-text">LIVE</span>
             </div>
 
             {/* Selected hotspot info - hidden on mobile */}
             {selectedHotspot && (
-              <div className="hidden sm:block absolute bottom-20 left-6 bg-slate-800 border border-slate-600 p-4 max-w-[260px] z-10 rounded-lg shadow-xl">
+              <div className="hidden sm:block absolute bottom-20 left-6 bg-white border border-slate-200 p-4 max-w-[260px] z-10 rounded-lg shadow-xl">
                 <div className="flex items-center gap-2 mb-2">
                   <span
                     className="w-3 h-3 rounded-full animate-pulse-dot"
@@ -124,25 +124,25 @@ export default function Home() {
                                        selectedHotspot.severity === 'high' ? '#fdba74' : '#fde047' 
                     }}
                   />
-                  <span className="text-slate-100 text-sm font-bold">{selectedHotspot.name}</span>
+                  <span className="text-slate-900 text-sm font-bold">{selectedHotspot.name}</span>
                 </div>
-                <p className="text-slate-300 text-sm">{selectedHotspot.description}</p>
+                <p className="text-slate-600 text-sm">{selectedHotspot.description}</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Right Panel - Situations + Markets */}
-        <div className={`h-[40dvh] sm:h-full flex-shrink-0 flex flex-col border-t sm:border-t-0 sm:border-l border-slate-800/50 premium-card sm:corner-brackets sm:breathe-glow order-3 transition-all duration-300 ${hiddenPanels.has('markets') ? 'sm:w-[40px]' : layout === 'globe' ? 'sm:w-[200px]' : 'sm:w-[320px]'}`}>
+        <div className={`h-[40dvh] sm:h-full flex-shrink-0 flex flex-col border-t sm:border-t-0 sm:border-l border-slate-200 premium-card sm:corner-brackets sm:breathe-glow order-3 transition-all duration-300 ${hiddenPanels.has('markets') ? 'sm:w-[40px]' : layout === 'globe' ? 'sm:w-[200px]' : 'sm:w-[320px]'}`}>
           {/* Panel Header */}
-          <div className="hidden sm:flex h-6 bg-slate-900/80 border-b border-slate-700/50 items-center justify-between px-2 flex-shrink-0">
+          <div className="hidden sm:flex h-6 bg-slate-50/80 border-b border-slate-200 items-center justify-between px-2 flex-shrink-0">
             {!hiddenPanels.has('markets') && (
-              <span className="text-blue-400 text-[9px] font-bold tracking-widest">MARKETS</span>
+              <span className="text-blue-600 text-[9px] font-bold tracking-widest">MARKETS</span>
             )}
             <div className="flex items-center gap-1 ml-auto">
               <button
                 onClick={() => togglePanel('markets')}
-                className="p-0.5 hover:bg-slate-700/50 rounded transition-colors"
+                className="p-0.5 hover:bg-slate-100 rounded transition-colors"
                 title={hiddenPanels.has('markets') ? 'Expand panel' : 'Collapse panel'}
               >
                 {hiddenPanels.has('markets') ? (

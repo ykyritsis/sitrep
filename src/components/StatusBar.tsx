@@ -66,48 +66,48 @@ export default function StatusBar({ activeRegions, uplink }: StatusBarProps) {
   };
 
   const uplinkConfig = {
-    ONLINE: { color: '#86efac', bg: 'rgba(34, 197, 94, 0.15)' },
-    DEGRADED: { color: '#fde047', bg: 'rgba(234, 179, 8, 0.15)' },
-    OFFLINE: { color: '#fca5a5', bg: 'rgba(239, 68, 68, 0.15)' },
+    ONLINE: { color: '#006644', bg: 'rgba(0, 102, 68, 0.08)' },
+    DEGRADED: { color: '#b45309', bg: 'rgba(180, 83, 9, 0.08)' },
+    OFFLINE: { color: '#dc2626', bg: 'rgba(220, 38, 38, 0.08)' },
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
+    <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-slate-200">
       {/* Logo */}
       <div className="flex items-center gap-3">
-        <Globe2 className="w-4 h-4 text-blue-500" />
-        <span className="text-slate-200 font-bold tracking-wide text-xs">SITREP</span>
+        <Globe2 className="w-4 h-4 text-blue-600" />
+        <span className="text-slate-800 font-bold tracking-wide text-xs">GLOBAL COMMAND</span>
       </div>
 
       {/* Live Stats - Hidden on mobile */}
       <div className="hidden md:flex items-center gap-4">
         {/* Events Last Hour */}
         <div className="flex items-center gap-1.5 text-[10px]">
-          <Zap className="w-3 h-3 text-amber-400" />
-          <span className="text-slate-400">1H:</span>
-          <span className="text-amber-400 font-bold">{stats.eventsLastHour}</span>
+          <Zap className="w-3 h-3 text-amber-600" />
+          <span className="text-slate-500">1H:</span>
+          <span className="text-amber-600 font-bold">{stats.eventsLastHour}</span>
         </div>
         
         {/* Events Last 24h */}
         <div className="flex items-center gap-1.5 text-[10px]">
-          <TrendingUp className="w-3 h-3 text-blue-400" />
-          <span className="text-slate-400">24H:</span>
-          <span className="text-blue-400 font-bold">{stats.eventsLast24h}</span>
+          <TrendingUp className="w-3 h-3 text-blue-600" />
+          <span className="text-slate-500">24H:</span>
+          <span className="text-blue-600 font-bold">{stats.eventsLast24h}</span>
         </div>
         
         {/* Critical Count */}
         {stats.criticalCount > 0 && (
-          <div className="flex items-center gap-1.5 text-[10px] bg-red-500/10 px-2 py-0.5 rounded">
-            <AlertTriangle className="w-3 h-3 text-red-400" />
-            <span className="text-red-400 font-bold">{stats.criticalCount} CRITICAL</span>
+          <div className="flex items-center gap-1.5 text-[10px] bg-red-50 px-2 py-0.5 rounded">
+            <AlertTriangle className="w-3 h-3 text-red-600" />
+            <span className="text-red-600 font-bold">{stats.criticalCount} CRITICAL</span>
           </div>
         )}
         
         {/* Top Region */}
         <div className="flex items-center gap-1.5 text-[10px]">
-          <Activity className="w-3 h-3 text-emerald-400" />
-          <span className="text-slate-400">HOT:</span>
-          <span className="text-emerald-400 font-bold">{stats.topRegion}</span>
+          <Activity className="w-3 h-3 text-emerald-600" />
+          <span className="text-slate-500">HOT:</span>
+          <span className="text-emerald-600 font-bold">{stats.topRegion}</span>
         </div>
       </div>
 
@@ -132,9 +132,9 @@ export default function StatusBar({ activeRegions, uplink }: StatusBarProps) {
         </div>
 
         {/* Time */}
-        <div className="flex items-center gap-1.5 bg-slate-800 px-2 py-1 rounded">
-          <Clock className="w-3 h-3 text-slate-500" />
-          <span className="text-slate-300 font-mono text-[10px]">{formatTime(currentTime)}</span>
+        <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
+          <Clock className="w-3 h-3 text-slate-400" />
+          <span className="text-slate-600 font-mono text-[10px]">{formatTime(currentTime)}</span>
         </div>
       </div>
     </div>
