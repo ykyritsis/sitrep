@@ -1,28 +1,10 @@
-import type { Metadata } from "next";
-import { JetBrains_Mono } from "next/font/google";
-import "./globals.css";
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-});
-
+import type { Metadata } from 'next';
+import './globals.css';
 export const metadata: Metadata = {
-  title: "Command Center | Global Activity Monitor",
-  description: "Real-time global intelligence monitoring and analysis platform",
+  title: 'SITREP — Command Center',
+  description: 'Global reporting, regional signals and prediction markets in one connected workspace.',
 };
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en" className="dark">
-      <body className={`${jetbrainsMono.variable} antialiased`}>
-        {children}
-      </body>
-    </html>
-  );
+export default function RootLayout({children}: Readonly<{children:React.ReactNode}>) {
+  return <html lang="en" className="dark"><body>{children}</body></html>;
 }
+

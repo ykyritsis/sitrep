@@ -25,7 +25,8 @@ export default function PopoutButton({ panel, className = '' }: PopoutButtonProp
     <button
       onClick={handlePopout}
       className={`p-1 hover:bg-slate-700/50 rounded transition-colors group ${className}`}
-      title={`Pop out to new window`}
+      title={`Open ${panel} in a new window`}
+      aria-label={`Open ${panel} in a new window`}
     >
       <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-slate-300" />
     </button>

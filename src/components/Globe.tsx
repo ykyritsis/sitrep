@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { HotspotData } from '@/types';
+import type { GlobeMethods } from 'react-globe.gl';
+import { Pause, Play, RotateCcw } from 'lucide-react';
+import { useFeed } from '@/lib/use-feed';
 
 const GlobeGL = dynamic(() => import('react-globe.gl'), { ssr: false });
 
@@ -52,24 +55,21 @@ const eventTypeConfig: Record<string, { label: string; color: string }> = {
   breaking: { label: 'BREAKING', color: '#fbbf24' },
 };
 
-// Key conflict relationship arcs (only major ongoing conflicts)
-const CONFLICT_ARCS = [
-  // Russia -> Ukraine (active war)
-  { startLat: 55.75, startLng: 37.62, endLat: 50.45, endLng: 30.52, color: '#ef444466', label: 'RUS-UKR' },
-  // Iran -> Israel (proxy conflict)
-  { startLat: 35.69, startLng: 51.39, endLat: 31.77, endLng: 35.22, color: '#f9731666', label: 'IRN-ISR' },
-  // US -> Middle East (military presence)
-  { startLat: 38.9, startLng: -77.04, endLat: 29.31, endLng: 47.48, color: '#3b82f644', label: 'US-ME' },
-];
-
-export default function Globe({ hotspots, onHotspotClick, onEventClick }: GlobeProps) {
-  const globeRef = useRef<any>(null);
+export default function Globe({ onHotspotClick, onEventClick }: GlobeProps) {
+  const globeRef = useRef<GlobeMethods | undefined>(undefined);
+  const container = useRef<HTMLDivElement>(null);
+  const [size,setSize] = useState({width:0,height:0});
+  const [rotating,setRotating] = useState(false);
+  useEffect(() => {
+    if (!container.current) return;
+    const observer = new ResizeObserver(([entry]) => setSize({width:Math.floor(entry.contentRect.width),height:Math.floor(entry.contentRect.height)}));
+    observer.observe(container.current);
+    return () => observer.disconnect();
+  },[]);
   const [globeReady, setGlobeReady] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<LiveEvent | null>(null);
-  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [arcsData] = useState(CONFLICT_ARCS);
-  const [countries, setCountries] = useState<any>({ features: [] });
+  const {items:liveEvents,loading,error} = useFeed<LiveEvent>('/api/events','events',120000);
+  const [countries, setCountries] = useState<{features:object[]}>({ features: [] });
 
   // Fetch country borders GeoJSON
   useEffect(() => {
@@ -79,34 +79,15 @@ export default function Globe({ hotspots, onHotspotClick, onEventClick }: GlobeP
       .catch(err => console.error('Failed to load countries:', err));
   }, []);
 
-  // Fetch live events from API
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const res = await fetch('/api/events');
-        if (res.ok) {
-          const data = await res.json();
-          setLiveEvents(data.events || []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch events:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEvents();
-    const interval = setInterval(fetchEvents, 120000); // Refresh every 2 minutes
-    return () => clearInterval(interval);
-  }, []);
-
   useEffect(() => {
     if (globeRef.current && globeReady) {
-      globeRef.current.controls().autoRotate = true;
+      globeRef.current.controls().autoRotate = false;
       globeRef.current.controls().autoRotateSpeed = 0.05;
       globeRef.current.pointOfView({ lat: 25, lng: 40, altitude: 2.2 });
     }
   }, [globeReady]);
+
+  useEffect(() => { if (globeRef.current && globeReady) globeRef.current.controls().autoRotate = rotating; },[rotating,globeReady]);
 
   // Live event points only (removed hardcoded hotspots) - smaller dots
   const eventPoints = useMemo(() => liveEvents.map((e) => ({
@@ -142,9 +123,10 @@ export default function Globe({ hotspots, onHotspotClick, onEventClick }: GlobeP
     { lat: 35.0, lng: 38.5, label: 'SYRIA', color: '#94a3b8' },
   ], []);
 
-  const handlePointClick = useCallback((point: any) => {
+  const handlePointClick = useCallback((data: object) => {
+    const point = data as LiveEvent & {isHotspot?: boolean};
     if (point.isHotspot && onHotspotClick) {
-      onHotspotClick(point as HotspotData);
+      onHotspotClick(point as unknown as HotspotData);
     } else if (!point.isHotspot) {
       setSelectedEvent(point as LiveEvent);
       if (onEventClick) onEventClick(point as LiveEvent);
@@ -155,7 +137,9 @@ export default function Globe({ hotspots, onHotspotClick, onEventClick }: GlobeP
     }
   }, [onHotspotClick, onEventClick]);
 
-  const getPointLabel = useCallback((d: any) => {
+  const getPointLabel = useCallback((data: object) => {
+    const d = data as LiveEvent & {isHotspot?: boolean; name?: string};
+    const escape = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]!));
     const config = eventTypeConfig[d.type] || { label: 'EVENT', color: '#00ff41' };
     const color = d.isHotspot ? severityColors[d.severity] : config.color;
     return `
@@ -163,32 +147,34 @@ export default function Globe({ hotspots, onHotspotClick, onEventClick }: GlobeP
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
           <span style="color: ${color}; font-weight: 700; font-size: 10px; background: ${color}22; padding: 2px 6px; border-radius: 3px;">${d.isHotspot ? 'HOTSPOT' : config.label}</span>
         </div>
-        <div style="color: #f1f5f9; font-weight: 600; font-size: 12px; margin-bottom: 6px;">${d.isHotspot ? d.name : d.title}</div>
-        <div style="color: #94a3b8; font-size: 11px; line-height: 1.5;">${d.description}</div>
-        ${!d.isHotspot && d.source ? `<div style="color: #60a5fa; font-size: 10px; margin-top: 8px;">${d.source}</div>` : ''}
+        <div style="color: #f1f5f9; font-weight: 600; font-size: 12px; margin-bottom: 6px;">${escape(d.isHotspot ? d.name : d.title)}</div>
+        <div style="color: #94a3b8; font-size: 11px; line-height: 1.5;">${escape(d.description)}</div>
+        ${!d.isHotspot && d.source ? `<div style="color: #60a5fa; font-size: 10px; margin-top: 8px;">${escape(d.source)}</div>` : ''}
       </div>
     `;
   }, []);
 
   return (
-    <div className="w-full h-full relative flex items-center justify-center">
-      <GlobeGL
+    <div ref={container} className="w-full h-full relative flex items-center justify-center">
+      {size.width > 0 && size.height > 0 && <GlobeGL
+        width={size.width}
+        height={size.height}
+        backgroundColor="rgba(0,0,0,0)"
         ref={globeRef}
         globeImageUrl="//unpkg.com/three-globe/example/img/earth-night.jpg"
         bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
-        backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
         // Country polygons for borders - clear land/water distinction
         polygonsData={countries.features}
-        polygonCapColor={() => 'rgba(30, 58, 95, 0.85)'}
-        polygonSideColor={() => 'rgba(59, 130, 246, 0.3)'}
-        polygonStrokeColor={() => 'rgba(147, 197, 253, 0.7)'}
+        polygonCapColor={() => 'rgba(62, 74, 89, 0.65)'}
+        polygonSideColor={() => 'rgba(110, 130, 156, 0.2)'}
+        polygonStrokeColor={() => 'rgba(160, 178, 203, 0.4)'}
         polygonAltitude={0.006}
         // Points
         pointsData={allPoints}
         pointLat="lat"
         pointLng="lng"
         pointColor="color"
-        pointAltitude={(d: any) => d.isHotspot ? 0.015 : 0.025}
+        pointAltitude={0.025}
         pointRadius="size"
         pointLabel={getPointLabel}
         onPointClick={handlePointClick}
@@ -223,29 +209,27 @@ export default function Globe({ hotspots, onHotspotClick, onEventClick }: GlobeP
         labelAltitude={0.008}
         labelIncludeDot={false}
         // Atmosphere - subtle blue glow
-        atmosphereColor="#3b82f6"
-        atmosphereAltitude={0.15}
+        atmosphereColor="#7c95b5"
+        atmosphereAltitude={0.1}
         onGlobeReady={() => setGlobeReady(true)}
-      />
+      />}
 
       {/* World Clocks - Pentagon Style - Hidden on small screens */}
-      <div className="absolute top-3 left-3 hidden sm:flex gap-2 z-10">
+      <div className="world-clocks">
         <WorldClock timezone="America/New_York" label="DC" />
         <WorldClock timezone="Europe/London" label="LON" />
-        <WorldClock timezone="Europe/Moscow" label="MSK" />
-        <WorldClock timezone="Asia/Jerusalem" label="TLV" />
         <WorldClock timezone="Asia/Shanghai" label="BEI" />
         <WorldClock timezone="Asia/Tokyo" label="TYO" />
       </div>
 
       {/* Event Legend - Top right on desktop, bottom left on mobile */}
-      <div className="absolute top-3 right-3 sm:top-3 sm:right-3 bg-slate-900/95 border border-slate-700 rounded-lg p-2 sm:p-2.5 text-[8px] sm:text-[9px] z-10">
-        <div className="text-slate-400 mb-1.5 font-bold tracking-wider">EVENTS</div>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+      <div className="event-legend">
+        <div className="event-legend-title">EVENTS</div>
+        <div className="event-legend-items">
           {Object.entries(eventTypeConfig).slice(0, 6).map(([type, config]) => (
             <div key={type} className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />
-              <span className="text-slate-500 text-[8px]">{config.label}</span>
+              <span >{config.label}</span>
             </div>
           ))}
         </div>
@@ -253,8 +237,9 @@ export default function Globe({ hotspots, onHotspotClick, onEventClick }: GlobeP
 
       {/* Selected Event Panel */}
       {selectedEvent && (
-        <div className="absolute bottom-28 left-6 bg-slate-800 border border-slate-600 rounded-lg p-5 max-w-[360px] z-20 shadow-2xl">
+        <div className="selected-event">
           <button 
+            aria-label="Close event details"
             onClick={() => setSelectedEvent(null)}
             className="absolute top-3 right-3 text-slate-400 hover:text-slate-100 text-lg"
           >
@@ -308,16 +293,12 @@ export default function Globe({ hotspots, onHotspotClick, onEventClick }: GlobeP
         </div>
       )}
 
-      {/* Event Count - Bottom Right */}
-      <div className="absolute bottom-3 right-3 bg-slate-900/90 border border-slate-700 rounded px-3 py-1.5 text-[10px] font-mono">
-        {loading ? (
-          <span className="text-slate-500">LOADING...</span>
-        ) : (
-          <>
-            <span className="text-slate-500">ACTIVE: </span>
-            <span className="text-emerald-400 font-bold">{liveEvents.length}</span>
-          </>
-        )}
+      <div className="globe-tools">
+        <div className="globe-tool-buttons">
+          <button className="icon-button" aria-label={rotating ? 'Pause globe rotation':'Rotate globe'} aria-pressed={rotating} onClick={() => setRotating(!rotating)}>{rotating ? <Pause size={14}/> : <Play size={14}/>}</button>
+          <button className="icon-button" aria-label="Reset globe view" onClick={() => { globeRef.current?.pointOfView({lat:25,lng:40,altitude:2.2},800); setSelectedEvent(null); }}><RotateCcw size={14}/></button>
+        </div>
+        <span className="event-count" role="status">{error ? 'Events unavailable' : loading ? 'Updating events…' : liveEvents.length + ' mapped events'}</span>
       </div>
     </div>
   );
@@ -344,9 +325,7 @@ function WorldClock({ timezone, label }: { timezone: string; label: string }) {
   }, [timezone]);
 
   return (
-    <div className="bg-slate-900/95 border border-slate-700/50 rounded-md px-2.5 py-1.5 text-center backdrop-blur-sm">
-      <div className="text-[7px] text-slate-400 font-bold tracking-[0.2em] mb-0.5">{label}</div>
-      <div className="text-[13px] text-amber-400 font-mono font-bold">{time}</div>
-    </div>
+    <div className="world-clock"><small>{label}</small><span>{time || '—'}</span></div>
   );
 }
+
