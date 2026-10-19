@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 // Server-side only. The key is read from the environment and never sent to the browser.
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
 const BRIEF_TTL = 30 * 60 * 1000; // regenerate at most every 30 minutes
 const MAX_HEADLINES = 30;
 
@@ -14,10 +14,10 @@ interface BriefPoint {
 let briefCache: { points: BriefPoint[]; generatedAt: string; timestamp: number } | null = null;
 
 export async function GET(request: Request) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'Daily brief is not configured. Set GEMINI_API_KEY on the server.' },
+      { error: 'Daily brief is not configured. Set DEEPSEEK_API_KEY on the server.' },
       { status: 503 }
     );
   }
@@ -48,35 +48,34 @@ Use ONLY the numbered headlines below. Do not add facts, names, numbers or cause
 
 Write 5 to 7 points. Group related headlines into one point. Each point must list the headline numbers it is based on.
 
-Return only JSON in this exact shape, with no other text:
-[{"theme": "short label, 1-3 words", "text": "one or two plain sentences", "sourceIndexes": [0, 4]}]
+Return only a JSON object in this exact shape, with no other text:
+{"points": [{"theme": "short label, 1-3 words", "text": "one or two plain sentences", "sourceIndexes": [0, 4]}]}
 
 Headlines:
 ${numbered}`;
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
-        }),
-      }
-    );
+    const deepseekRes = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+      }),
+    });
 
-    if (!geminiRes.ok) {
-      const detail = await geminiRes.text();
-      console.error('Gemini request failed', geminiRes.status, detail.slice(0, 300));
-      return NextResponse.json({ error: 'Brief generation failed. Try again later.' }, { status: 502 });
+    if (!deepseekRes.ok) {
+      const detail = await deepseekRes.text();
+      console.error("DeepSeek request failed", deepseekRes.status, detail.slice(0, 300));
+      return NextResponse.json({ error: "Brief generation failed. Try again later." }, { status: 502 });
     }
 
-    const data = await geminiRes.json();
-    const raw: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '[]';
-    const parsed = JSON.parse(raw) as { theme: string; text: string; sourceIndexes: number[] }[];
+    const data = await deepseekRes.json();
+    const raw: string = data?.choices?.[0]?.message?.content ?? "{}";
+    const parsed = (JSON.parse(raw) as { points?: { theme: string; text: string; sourceIndexes: number[] }[] }).points ?? [];
 
-    // Map the model's indexes back to real links. Drop any index that doesn't exist.
+    // Map the model indexes back to real links. Drop any index that does not exist.
     const points: BriefPoint[] = parsed.map((p) => ({
       theme: String(p.theme),
       text: String(p.text),
