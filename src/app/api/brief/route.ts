@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 
 Use ONLY the numbered headlines below. Do not add facts, names, numbers or causes that are not in the headlines. If the headlines do not support a claim, leave it out.
 
-Write 5 to 7 points. Group related headlines into one point. Each point must list the headline numbers it is based on.
+Write 3 or 4 points. Group related headlines into one point. Each text must be one short sentence of 20 words or fewer. Each point must list the headline numbers it is based on.
 
 Return only a JSON object in this exact shape, with no other text:
 {"points": [{"theme": "short label, 1-3 words", "text": "one or two plain sentences", "sourceIndexes": [0, 4]}]}
