@@ -123,3 +123,40 @@ h1 { color: var(--foreground); }
 .globe-panel .panel-header p { color: #9aa4b2; }
 .globe-panel .icon-button { color: #9aa4b2; }
 .globe-panel .icon-button:hover { background: #ffffff12; color: #fff; border-color: #ffffff1f; }
+
+/* ---- Modern pass: rounder cards, tighter header, better use of space ---- */
+.panel { border-radius: 16px; }
+.hero-art { width: 64px; height: 64px; margin-right: 14px; }
+.workspace-heading { padding: 18px 0 16px; }
+h1 { font-size: 30px; letter-spacing: -0.8px; }
+.panel-header { min-height: 58px; padding: 14px 18px; background: linear-gradient(180deg, #fff, #fbfcfe); }
+.story { padding: 14px 0; }
+.story-title { font-size: 13.5px; }
+.feed-tools { padding-top: 12px; }
+.feed-scroll { padding-bottom: 4px; }
+
+/* Ask the feed */
+.ask-card { margin: 0 0 12px; padding: 14px; border-radius: 12px; background: #fff; border: 1px solid #e2e8f3; box-shadow: 0 1px 2px #0f172a0a; }
+.ask-title { display: flex; align-items: center; gap: 7px; margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #0f766e; }
+.ask-form { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; }
+.ask-form:focus-within { border-color: #0f766e; box-shadow: 0 0 0 3px #0f766e1f; }
+.ask-form input { flex: 1; min-width: 0; border: 0; background: transparent; font-size: 13px; color: #111827; padding: 7px 0; outline: none; }
+.ask-form input::placeholder { color: #9aa3b2; }
+.ask-form button { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; border: 0; background: #0f766e; color: #fff; }
+.ask-form button:disabled { background: #cbd5e1; cursor: not-allowed; }
+.ask-examples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ask-examples button { font-size: 11px; padding: 5px 9px; border-radius: 999px; border: 1px solid #d6dde8; background: #fff; color: #334155; }
+.ask-examples button:hover { border-color: #0f766e; color: #0f766e; }
+.ask-status { margin: 10px 0 0; font-size: 12px; color: #64748b; }
+.ask-error { margin: 10px 0 0; font-size: 12px; color: #b45309; }
+.ask-answer { margin-top: 12px; padding: 12px 13px; border-radius: 10px; background: #f0fdfa; border: 1px solid #ccfbf1; }
+.ask-answer p { margin: 0; font-size: 13px; line-height: 1.55; color: #111827; }
+.ask-sources, .ask-note { margin-top: 8px !important; font-size: 11px !important; color: #5b6474 !important; }
+.ask-sources a { color: #0f766e; }
+.ask-sources a:hover { text-decoration: underline; }
+
+/* Greek headline toggle */
+.translate-toggle { margin-left: auto; font-size: 11px; padding: 4px 9px; border-radius: 999px; border: 1px solid #d6dde8; background: #fff; color: #475569; }
+.translate-toggle[aria-pressed="true"] { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.story-translation { margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; color: #1e3a8a; }
+.globe-panel .panel-header { background: #0f141c; }
