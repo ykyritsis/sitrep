@@ -6,6 +6,7 @@ import { Globe2, LayoutDashboard, Radio, TrendingUp, Maximize2, Minimize2, Arrow
 import NewsFeed from '@/components/NewsFeed';
 import DailyBrief from '@/components/DailyBrief';
 import HeroArt from '@/components/HeroArt';
+import AskFeed from '@/components/AskFeed';
 import MarketOdds from '@/components/MarketOdds';
 import CurrentSituations from '@/components/CurrentSituations';
 import PopoutButton from '@/components/PopoutButton';
@@ -37,7 +38,7 @@ export default function Home() {
     <nav className="workspace-nav" aria-label="Workspace view"><div className="view-switcher">{views.map(({id,label,Icon}) => <button key={id} aria-pressed={view===id} onClick={() => setView(id)}><Icon size={14}/><span>{label}</span></button>)}</div><span className="auto-refresh"><span/>Automatic updates</span></nav>
     {fullscreenError && <p className="feed-notice" role="status">{fullscreenError}</p>}
     <main className={'workspace view-'+view}>
-      <div className="panel intelligence-panel"><DailyBrief/><NewsFeed/></div>
+      <div className="panel intelligence-panel"><DailyBrief/><AskFeed/><NewsFeed/></div>
       <section className="panel globe-panel" aria-label="Global event map"><header className="panel-header"><div><h2>Global view</h2><p>Reported events, mapped geographically</p></div><PopoutButton panel="globe" className="icon-button"/></header><div className="globe-stage"><Globe hotspots={[]}/></div><div className="globe-caption"><span>Drag to explore · Scroll to zoom</span><span>Locations are approximate</span></div></section>
       <aside className="signals-column"><div className="panel situations-panel"><CurrentSituations/></div><div className="panel markets-panel"><MarketOdds/></div></aside>
     </main>
