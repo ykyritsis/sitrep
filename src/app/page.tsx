@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { Globe2, LayoutDashboard, Radio, TrendingUp, Maximize2, Minimize2, ArrowUpRight } from 'lucide-react';
 import NewsFeed from '@/components/NewsFeed';
 import DailyBrief from '@/components/DailyBrief';
+import HeroArt from '@/components/HeroArt';
 import MarketOdds from '@/components/MarketOdds';
 import CurrentSituations from '@/components/CurrentSituations';
 import PopoutButton from '@/components/PopoutButton';
@@ -32,7 +33,7 @@ export default function Home() {
       <Link className="brand-lockup" href="/"><span className="brand-symbol"><Globe2 size={23}/></span><span><strong>SITREP<span className="brand-divider">/</span><span className="brand-descriptor">Command Center</span></strong><small>A clearer view of a complex world.</small></span></Link>
       <div className="header-right"><span className="utc-clock">{time || 'Synchronizing'}<small>UTC</small></span><button className="icon-button fullscreen-button" aria-label={fullscreen ? 'Exit fullscreen':'Enter fullscreen'} onClick={toggleFullscreen}>{fullscreen ? <Minimize2 size={17}/>:<Maximize2 size={17}/>}</button></div>
     </header>
-    <div className="workspace-heading"><div><span className="eyebrow">GLOBAL INTELLIGENCE</span><h1>The world, in focus.</h1></div><p>Reporting. Regional signals. Market sentiment.<br/>One connected workspace.</p></div>
+    <div className="workspace-heading"><div className="hero-art"><HeroArt/></div><div><span className="eyebrow">GLOBAL INTELLIGENCE</span><h1>The world, in focus.</h1></div><p>Reporting. Regional signals. Market sentiment.<br/>One connected workspace.</p></div>
     <nav className="workspace-nav" aria-label="Workspace view"><div className="view-switcher">{views.map(({id,label,Icon}) => <button key={id} aria-pressed={view===id} onClick={() => setView(id)}><Icon size={14}/><span>{label}</span></button>)}</div><span className="auto-refresh"><span/>Automatic updates</span></nav>
     {fullscreenError && <p className="feed-notice" role="status">{fullscreenError}</p>}
     <main className={'workspace view-'+view}>
