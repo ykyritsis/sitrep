@@ -26,6 +26,8 @@ Open http://localhost:3000.
 | `DEEPSEEK_API_KEY` | For the daily brief | Server-side key for the DeepSeek API. Never sent to the browser. |
 | `DEEPSEEK_MODEL` | No | Model name. Defaults to `deepseek-chat`. |
 
+The Ask and Greek features use the same key as the daily brief.
+
 Without `DEEPSEEK_API_KEY` the daily brief shows a "not configured" message. The rest of the dashboard still works.
 
 On Vercel, add these under **Project Settings → Environment Variables**, then redeploy.
