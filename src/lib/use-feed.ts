@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isTabHidden } from '@/lib/shared-fetch';
 
 export function useFeed<T>(url: string, key: string, interval: number) {
   const [items, setItems] = useState<T[]>([]);
@@ -29,7 +30,7 @@ export function useFeed<T>(url: string, key: string, interval: number) {
   }, [url, key]);
   useEffect(() => {
     const initial = setTimeout(() => void refresh(), 0);
-    const timer = setInterval(() => void refresh(), interval);
+    const timer = setInterval(() => { if (!isTabHidden()) void refresh(); }, interval);
     return () => { clearTimeout(initial); clearInterval(timer); request.current?.abort(); };
   }, [refresh, interval]);
   return { items, loading, error, updated, refresh };

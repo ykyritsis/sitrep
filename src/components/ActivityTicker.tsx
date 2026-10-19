@@ -1,4 +1,5 @@
 'use client';
+import { sharedJson, isTabHidden } from '@/lib/shared-fetch';
 
 import { useState, useEffect } from 'react';
 import { Clock, AlertTriangle, Zap, Globe2 } from 'lucide-react';
@@ -19,8 +20,7 @@ export default function ActivityTicker() {
     // Fetch initial activities
     const fetchActivities = async () => {
       try {
-        const response = await fetch('/api/news?limit=10');
-        const data = await response.json();
+        const data = await sharedJson<{ items?: any[] }>('/api/news', 55000);
         
         const newsActivities: ActivityItem[] = (data.items || []).slice(0, 10).map((item: any, index: number) => ({
           id: `news-${index}`,
@@ -37,7 +37,7 @@ export default function ActivityTicker() {
     };
 
     fetchActivities();
-    const interval = setInterval(fetchActivities, 60000);
+    const interval = setInterval(() => { if (!isTabHidden()) fetchActivities(); }, 60000);
     return () => clearInterval(interval);
   }, []);
 

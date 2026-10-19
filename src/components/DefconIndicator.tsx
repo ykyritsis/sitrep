@@ -1,4 +1,5 @@
 'use client';
+import { sharedJson, isTabHidden } from '@/lib/shared-fetch';
 
 import { useState, useEffect } from 'react';
 import { Shield } from 'lucide-react';
@@ -27,8 +28,7 @@ export default function DefconIndicator() {
   useEffect(() => {
     const calculateDefcon = async () => {
       try {
-        const response = await fetch('/api/news');
-        const data = await response.json();
+        const data = await sharedJson<{ items?: any[] }>('/api/news', 55000);
         const items = data.items || [];
         
         // Count critical and high severity items
@@ -52,7 +52,7 @@ export default function DefconIndicator() {
     };
 
     calculateDefcon();
-    const interval = setInterval(calculateDefcon, 60000);
+    const interval = setInterval(() => { if (!isTabHidden()) calculateDefcon(); }, 60000);
     return () => clearInterval(interval);
   }, []);
 

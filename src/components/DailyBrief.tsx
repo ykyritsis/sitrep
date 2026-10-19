@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { isTabHidden } from '@/lib/shared-fetch';
 
 interface BriefSource {
   title: string;
@@ -45,7 +46,8 @@ export default function DailyBrief() {
 
   useEffect(() => {
     load();
-    const id = setInterval(load, REFRESH_MS);
+    // The brief changes at most every 30 minutes on the server, so only poll while the tab is visible.
+    const id = setInterval(() => { if (!isTabHidden()) load(); }, REFRESH_MS);
     return () => clearInterval(id);
   }, []);
 

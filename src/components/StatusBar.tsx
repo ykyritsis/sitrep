@@ -1,4 +1,5 @@
 'use client';
+import { sharedJson, isTabHidden } from '@/lib/shared-fetch';
 
 import { useState, useEffect } from 'react';
 import { Wifi, WifiOff, Clock, Activity, Globe2, TrendingUp, AlertTriangle, Zap } from 'lucide-react';
@@ -29,8 +30,7 @@ export default function StatusBar({ activeRegions, uplink }: StatusBarProps) {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/news');
-        const data = await response.json();
+        const data = await sharedJson<{ items?: any[] }>('/api/news', 55000);
         const items = data.items || [];
         
         const now = new Date();
@@ -57,7 +57,7 @@ export default function StatusBar({ activeRegions, uplink }: StatusBarProps) {
     };
 
     fetchStats();
-    const interval = setInterval(fetchStats, 60000);
+    const interval = setInterval(() => { if (!isTabHidden()) fetchStats(); }, 60000);
     return () => clearInterval(interval);
   }, []);
 
