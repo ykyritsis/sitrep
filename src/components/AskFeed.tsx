@@ -77,7 +77,7 @@ export default function AskFeed() {
               ))}
             </p>
           )}
-          <p className="ask-note">Answered from the headlines currently shown. Check the sources.</p>
+          <p className="ask-note">From the current headlines. Check the sources.</p>
         </div>
       )}
     </section>

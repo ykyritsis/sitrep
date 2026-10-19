@@ -170,7 +170,7 @@ export async function GET() {
         }
 
         // Larger scatter radius to spread out clustered events
-        const scatterRadius = 1.5; // degrees
+        const scatterRadius = 2.2; // degrees
         const angle = Math.random() * 2 * Math.PI;
         const distance = Math.random() * scatterRadius;
         const latOffset = Math.sin(angle) * distance;
@@ -201,7 +201,7 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      events: events.slice(0, 100), // WAY more globe events
+      events: events.slice(0, 400),
       timestamp: new Date().toISOString(),
       count: events.length,
     });

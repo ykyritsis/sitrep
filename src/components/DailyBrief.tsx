@@ -87,8 +87,8 @@ export default function DailyBrief() {
       </ul>
 
       <p className="brief-note">
-        AI-generated summary of the current headlines. Check the linked sources before relying on it.
-        {generatedAt && ` Updated ${new Date(generatedAt).toLocaleTimeString()}.`}
+        AI-generated from current headlines. Check the sources.
+        {generatedAt && ` Updated ${new Date(generatedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}.`}
       </p>
     </section>
   );

@@ -8,6 +8,7 @@ interface FeedStore {
   listeners: Set<() => void>;
   controller: AbortController | null;
   timer: ReturnType<typeof setInterval> | null;
+  retry: ReturnType<typeof setTimeout> | null;
 }
 
 const INITIAL: FeedState<never> = { items: [], loading: true, error: false, updated: null };
@@ -19,7 +20,7 @@ const stores = new Map<string, FeedStore>();
 function getStore(url: string): FeedStore {
   let store = stores.get(url);
   if (!store) {
-    store = { state: INITIAL, listeners: new Set(), controller: null, timer: null };
+    store = { state: INITIAL, listeners: new Set(), controller: null, timer: null, retry: null };
     stores.set(url, store);
   }
   return store;
@@ -33,6 +34,7 @@ function setState(store: FeedStore, patch: Partial<FeedState<unknown>>) {
 async function load(url: string, key: string) {
   const store = getStore(url);
   store.controller?.abort();
+  if (store.retry) { clearTimeout(store.retry); store.retry = null; }
   const controller = new AbortController();
   store.controller = controller;
   setState(store, { loading: true });
@@ -44,7 +46,11 @@ async function load(url: string, key: string) {
     if (controller.signal.aborted) return;
     setState(store, { items: data[key], updated: new Date(), error: false, loading: false });
   } catch {
-    if (!controller.signal.aborted) setState(store, { error: true, loading: false });
+    if (!controller.signal.aborted) {
+      setState(store, { error: true, loading: false });
+      // Don't wait for the next poll: a failed feed is retried shortly, which matters for slow-refresh feeds.
+      store.retry = setTimeout(() => { if (store.listeners.size) void load(url, key); }, 20000);
+    }
   }
 }
 
@@ -61,6 +67,8 @@ export function useFeed<T>(url: string, key: string, interval: number) {
       store.listeners.delete(listener);
       if (store.listeners.size === 0) {
         if (store.timer) clearInterval(store.timer);
+        if (store.retry) clearTimeout(store.retry);
+        store.retry = null;
         store.timer = null;
         store.controller?.abort();
         if (store.state.loading) store.state = { ...store.state, loading: false };

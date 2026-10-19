@@ -46,9 +46,9 @@ export default function NewsFeed({category = 'all', limit, onMore}: {category?: 
   }, [greek, visibleKey]);
   const shown = limit ? filtered.slice(0, limit) : filtered;
   return <section className="feed">
-    <FeedHeader title={limit ? 'Latest headlines' : 'Intelligence'} subtitle={updated ? items.length + ' stories · Updated ' + updated.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'Global reporting, in one place'} loading={loading} refresh={refresh} panel="intel"/>
+    <FeedHeader title={limit ? 'Latest headlines' : 'Headlines'} subtitle={updated ? items.length + ' stories · ' + updated.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'Live headlines'} loading={loading} refresh={refresh} panel="intel"/>
     {!limit && <div className="feed-tools">
-      <label className="search-field"><Search size={16}/><input type="search" aria-label="Search intelligence" placeholder="Search headlines, sources, countries…" value={query} onChange={e => setQuery(e.target.value)}/></label>
+      <label className="search-field"><Search size={16}/><input type="search" aria-label="Search headlines" placeholder="Search headlines, sources, countries" value={query} onChange={e => setQuery(e.target.value)}/></label>
       <div className="filter-row"><button aria-pressed={!priority} onClick={() => setPriority(false)}>All stories</button><button aria-pressed={priority} onClick={() => setPriority(true)}>High priority</button><button className="translate-toggle" aria-pressed={greek} onClick={() => setGreek(g => !g)} title="Translate the first 10 stories into Greek">{translating ? 'Translating…' : 'Ελληνικά'}</button><span>{filtered.length} shown</span></div>
     </div>}
     <div className="feed-scroll">
@@ -68,7 +68,7 @@ export default function NewsFeed({category = 'all', limit, onMore}: {category?: 
       })}
     </div>
     {onMore ? <button className="panel-more" onClick={onMore}>Open the full feed<ArrowRight size={16}/></button>
-      : <div className="panel-footnote">Public sources · Refreshes every minute</div>}
+      : <div className="panel-footnote">Public sources · refreshes every minute</div>}
   </section>;
 }
 
