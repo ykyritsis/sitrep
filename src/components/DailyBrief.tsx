@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Sparkles } from 'lucide-react';
 import { isTabHidden } from '@/lib/shared-fetch';
 
 interface BriefSource {
@@ -52,33 +52,31 @@ export default function DailyBrief() {
   }, []);
 
   return (
-    <section className="rounded-lg border border-slate-700/60 bg-slate-900/60 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-200">Daily brief</h2>
-        <button onClick={load} className="text-slate-400 hover:text-slate-200" aria-label="Refresh brief">
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+    <section className="brief-card" aria-labelledby="daily-brief-title">
+      <div className="brief-header">
+        <h2 id="daily-brief-title" className="brief-title">
+          <Sparkles size={14} aria-hidden="true" /> Daily brief
+        </h2>
+        <button onClick={load} className="icon-button brief-refresh" aria-label="Refresh brief">
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
 
-      {error && <p className="text-sm text-slate-400">{error}</p>}
+      {error && <p className="brief-muted">{error}</p>}
 
-      {!error && loading && points.length === 0 && (
-        <p className="text-sm text-slate-400">Generating brief…</p>
-      )}
+      {!error && loading && points.length === 0 && <p className="brief-muted">Generating brief…</p>}
 
-      <ul className="space-y-3">
+      <ul className="brief-list">
         {points.map((p, i) => (
-          <li key={i} className="text-sm text-slate-200">
-            <span className="mr-2 text-xs uppercase tracking-wide text-slate-400">{p.theme}</span>
-            <p>{p.text}</p>
+          <li key={i} className="brief-item">
+            <span className="brief-theme">{p.theme}</span>
+            <p className="brief-text">{p.text}</p>
             {p.sources.length > 0 && (
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="brief-sources">
                 {p.sources.map((s, j) => (
                   <span key={j}>
                     {j > 0 && ' · '}
-                    <a href={s.link} target="_blank" rel="noopener noreferrer" className="hover:text-slate-300 underline-offset-2 hover:underline">
-                      {s.source}
-                    </a>
+                    <a href={s.link} target="_blank" rel="noopener noreferrer">{s.source}</a>
                   </span>
                 ))}
               </p>
@@ -87,7 +85,7 @@ export default function DailyBrief() {
         ))}
       </ul>
 
-      <p className="mt-3 text-[11px] text-slate-500">
+      <p className="brief-note">
         AI-generated summary of headlines above. Check the linked sources before relying on it.
         {generatedAt && ` Updated ${new Date(generatedAt).toLocaleTimeString()}.`}
       </p>
