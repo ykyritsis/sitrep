@@ -54,11 +54,12 @@ export default function DailyBrief() {
   return (
     <section className="brief-card" aria-labelledby="daily-brief-title">
       <div className="brief-header">
-        <h2 id="daily-brief-title" className="brief-title">
-          <Sparkles size={14} aria-hidden="true" /> Daily brief
-        </h2>
+        <div>
+          <span className="brief-kicker"><Sparkles size={14} aria-hidden="true" /> AI summary</span>
+          <h2 id="daily-brief-title" className="brief-title">Today&apos;s brief</h2>
+        </div>
         <button onClick={load} className="icon-button brief-refresh" aria-label="Refresh brief">
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
 
@@ -69,7 +70,7 @@ export default function DailyBrief() {
       <ul className="brief-list">
         {points.map((p, i) => (
           <li key={i} className="brief-item">
-            <span className="brief-theme">{p.theme}</span>
+            <span className="brief-theme"><b>{String(i + 1).padStart(2, '0')}</b>{p.theme}</span>
             <p className="brief-text">{p.text}</p>
             {p.sources.length > 0 && (
               <p className="brief-sources">
@@ -86,7 +87,7 @@ export default function DailyBrief() {
       </ul>
 
       <p className="brief-note">
-        AI-generated summary of headlines above. Check the linked sources before relying on it.
+        AI-generated summary of the current headlines. Check the linked sources before relying on it.
         {generatedAt && ` Updated ${new Date(generatedAt).toLocaleTimeString()}.`}
       </p>
     </section>

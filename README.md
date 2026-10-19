@@ -70,7 +70,7 @@ src/
   app/
     api/            server routes: news, brief, ask, translate and data feeds
     page.tsx        dashboard layout
-    theme-light.css visual theme
+    globals.css     visual system: design tokens, layout and components
   components/       panels: brief, ask, feed, globe, markets, situations
   lib/              shared fetch cache, DeepSeek client, rate limiter, feed hook
 ```

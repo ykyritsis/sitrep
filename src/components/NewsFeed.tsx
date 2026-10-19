@@ -1,12 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Search, ArrowUpRight, ChevronDown } from 'lucide-react';
+import { Search, ArrowUpRight, ArrowRight, ChevronDown } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { NewsItem } from '@/types';
 import { useFeed } from '@/lib/use-feed';
 import FeedHeader from './FeedHeader';
 
-export default function NewsFeed({category = 'all'}: {category?: string}) {
+export default function NewsFeed({category = 'all', limit, onMore}: {category?: string; limit?: number; onMore?: () => void}) {
   const {items, loading, error, updated, refresh} = useFeed<NewsItem>('/api/news?category=' + encodeURIComponent(category), 'items', 60000);
   const [query, setQuery] = useState('');
   const [priority, setPriority] = useState(false);
@@ -44,17 +44,18 @@ export default function NewsFeed({category = 'all'}: {category?: string}) {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [greek, visibleKey]);
+  const shown = limit ? filtered.slice(0, limit) : filtered;
   return <section className="feed">
-    <FeedHeader title="Intelligence" subtitle={updated ? items.length + ' stories · Updated ' + updated.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'Global reporting, in one place'} loading={loading} refresh={refresh} panel="intel"/>
-    <div className="feed-tools">
-      <label className="search-field"><Search size={15}/><input aria-label="Search intelligence" placeholder="Search headlines, sources…" value={query} onChange={e => setQuery(e.target.value)}/></label>
-      <div className="filter-row"><button aria-pressed={!priority} onClick={() => setPriority(false)}>All stories</button><button aria-pressed={priority} onClick={() => setPriority(true)}>High priority</button><button className="translate-toggle" aria-pressed={greek} onClick={() => setGreek(g => !g)} title="Translate the first 10 stories into Greek">{translating ? 'Translating…' : 'Ελληνικά'}</button><span>{filtered.length}</span></div>
-    </div>
+    <FeedHeader title={limit ? 'Latest headlines' : 'Intelligence'} subtitle={updated ? items.length + ' stories · Updated ' + updated.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'Global reporting, in one place'} loading={loading} refresh={refresh} panel="intel"/>
+    {!limit && <div className="feed-tools">
+      <label className="search-field"><Search size={16}/><input type="search" aria-label="Search intelligence" placeholder="Search headlines, sources, countries…" value={query} onChange={e => setQuery(e.target.value)}/></label>
+      <div className="filter-row"><button aria-pressed={!priority} onClick={() => setPriority(false)}>All stories</button><button aria-pressed={priority} onClick={() => setPriority(true)}>High priority</button><button className="translate-toggle" aria-pressed={greek} onClick={() => setGreek(g => !g)} title="Translate the first 10 stories into Greek">{translating ? 'Translating…' : 'Ελληνικά'}</button><span>{filtered.length} shown</span></div>
+    </div>}
     <div className="feed-scroll">
       {error && <p className="feed-notice" role="status">Unable to refresh. {updated ? 'Showing the last received stories.' : 'Try refreshing again.'}</p>}
       {loading && !updated && <div className="empty-state">Connecting to news sources…</div>}
       {!loading && !error && filtered.length === 0 && <div className="empty-state">No stories match this view.</div>}
-      {filtered.map(item => {
+      {shown.map(item => {
         const date = new Date(item.pubDate);
         return <article className="story" key={item.id}>
           <div className="story-meta"><span>{item.source}</span><time dateTime={Number.isNaN(date.getTime()) ? undefined : date.toISOString()}>{Number.isNaN(date.getTime()) ? 'Time unavailable' : formatDistanceToNow(date, {addSuffix:true})}</time></div>
@@ -66,7 +67,8 @@ export default function NewsFeed({category = 'all'}: {category?: string}) {
         </article>;
       })}
     </div>
-    <div className="panel-footnote">Public sources · Refreshes every minute</div>
+    {onMore ? <button className="panel-more" onClick={onMore}>Open the full feed<ArrowRight size={16}/></button>
+      : <div className="panel-footnote">Public sources · Refreshes every minute</div>}
   </section>;
 }
 

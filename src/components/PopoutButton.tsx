@@ -24,11 +24,11 @@ export default function PopoutButton({ panel, className = '' }: PopoutButtonProp
   return (
     <button
       onClick={handlePopout}
-      className={`p-1 hover:bg-slate-700/50 rounded transition-colors group ${className}`}
+      className={className}
       title={`Open ${panel} in a new window`}
       aria-label={`Open ${panel} in a new window`}
     >
-      <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-slate-300" />
+      <ExternalLink size={16} />
     </button>
   );
 }

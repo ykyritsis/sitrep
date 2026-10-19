@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { HotspotData } from '@/types';
 import type { GlobeMethods } from 'react-globe.gl';
-import { Pause, Play, RotateCcw } from 'lucide-react';
+import { Pause, Play, RotateCcw, X, ArrowUpRight } from 'lucide-react';
 import { useFeed } from '@/lib/use-feed';
 
 const GlobeGL = dynamic(() => import('react-globe.gl'), { ssr: false });
@@ -155,7 +155,7 @@ export default function Globe({ onHotspotClick, onEventClick }: GlobeProps) {
   }, []);
 
   return (
-    <div ref={container} className="w-full h-full relative flex items-center justify-center">
+    <div ref={container} className="globe-root">
       {size.width > 0 && size.height > 0 && <GlobeGL
         width={size.width}
         height={size.height}
@@ -227,9 +227,9 @@ export default function Globe({ onHotspotClick, onEventClick }: GlobeProps) {
         <div className="event-legend-title">EVENTS</div>
         <div className="event-legend-items">
           {Object.entries(eventTypeConfig).slice(0, 6).map(([type, config]) => (
-            <div key={type} className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />
-              <span >{config.label}</span>
+            <div key={type}>
+              <i style={{ backgroundColor: config.color }} />
+              <span>{config.label.toLowerCase()}</span>
             </div>
           ))}
         </div>
@@ -237,58 +237,32 @@ export default function Globe({ onHotspotClick, onEventClick }: GlobeProps) {
 
       {/* Selected Event Panel */}
       {selectedEvent && (
-        <div className="selected-event">
-          <button 
-            aria-label="Close event details"
-            onClick={() => setSelectedEvent(null)}
-            className="absolute top-3 right-3 text-slate-400 hover:text-slate-100 text-lg"
-          >
-            ✕
+        <div className="selected-event" role="dialog" aria-label="Event details">
+          <button className="sheet-close" aria-label="Close event details" onClick={() => setSelectedEvent(null)}>
+            <X size={18} />
           </button>
-          <div className="mb-3">
-            <span 
-              className="text-[10px] font-bold px-2 py-1 rounded mb-2 inline-block"
-              style={{ 
-                color: eventTypeConfig[selectedEvent.type]?.color || '#94a3b8',
-                backgroundColor: `${eventTypeConfig[selectedEvent.type]?.color || '#94a3b8'}22`
-              }}
-            >
-              {eventTypeConfig[selectedEvent.type]?.label || 'EVENT'}
+          <span
+            className="event-type"
+            style={{
+              color: eventTypeConfig[selectedEvent.type]?.color || '#94a3b8',
+              backgroundColor: `${eventTypeConfig[selectedEvent.type]?.color || '#94a3b8'}22`
+            }}
+          >
+            {(eventTypeConfig[selectedEvent.type]?.label || 'Event').toLowerCase()}
+          </span>
+          <h3>{selectedEvent.title}</h3>
+          <p>{selectedEvent.description}</p>
+          <div className="event-footer">
+            <span className="event-severity" style={{ color: severityColors[selectedEvent.severity] }}>
+              <i style={{ backgroundColor: severityColors[selectedEvent.severity] }} />{selectedEvent.severity} severity
             </span>
-            <div className="text-slate-100 font-bold text-base leading-tight mt-2">{selectedEvent.title}</div>
-          </div>
-          <p className="text-slate-300 text-sm leading-relaxed mb-4">{selectedEvent.description}</p>
-          
-          {/* Source */}
-          <div className="flex items-center gap-3 mb-4 bg-blue-500/15 px-4 py-2.5 rounded-lg">
-            <span className="text-xs text-slate-400">SOURCE:</span>
             {selectedEvent.sourceUrl ? (
-              <a 
-                href={selectedEvent.sourceUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-400 text-sm font-bold hover:underline"
-              >
-                {selectedEvent.source} ↗
+              <a href={selectedEvent.sourceUrl} target="_blank" rel="noopener noreferrer">
+                {selectedEvent.source} <ArrowUpRight size={14} />
               </a>
             ) : (
-              <span className="text-blue-400 text-sm font-bold">{selectedEvent.source}</span>
+              <span>{selectedEvent.source}</span>
             )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span 
-              className="badge text-xs"
-              style={{ 
-                backgroundColor: `${severityColors[selectedEvent.severity]}20`,
-                color: severityColors[selectedEvent.severity]
-              }}
-            >
-              {selectedEvent.severity}
-            </span>
-            <span className="text-xs text-slate-400">
-              {selectedEvent.type}
-            </span>
           </div>
         </div>
       )}
