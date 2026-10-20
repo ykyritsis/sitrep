@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import Parser from 'rss-parser';
 import { NewsItem, RelatedArticle } from '@/types';
+import { translateToEnglish, LANGUAGE_NAMES } from '@/lib/translate';
+
+// Many feeds plus translation can take a while on a cold start.
+export const maxDuration = 60;
 
 const parser = new Parser({
-  timeout: 15000,
+  timeout: 9000,
   headers: {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     'Accept': 'application/rss+xml, application/xml, text/xml, */*',
@@ -12,9 +16,11 @@ const parser = new Parser({
 
 // In-memory cache for news items (shared across requests)
 let newsCache: { items: NewsItem[]; timestamp: number } | null = null;
-const CACHE_TTL = 30 * 1000; // 30 second cache for fresher updates
+const CACHE_TTL = 2 * 60 * 1000; // two minutes: there are many feeds behind this route
 
-const RSS_FEEDS = [
+interface Feed { url: string; source: string; category: string; lang?: string }
+
+const RSS_FEEDS: Feed[] = [
   // Google News - Breaking/Trending (aggregates all sources) - EXPANDED
   { url: 'https://news.google.com/rss/search?q=breaking+ukraine+OR+russia&hl=en-US&gl=US&ceid=US:en', source: 'Breaking', category: 'conflict' },
   { url: 'https://news.google.com/rss/search?q=breaking+israel+OR+gaza+OR+hamas&hl=en-US&gl=US&ceid=US:en', source: 'Breaking', category: 'conflict' },
@@ -45,9 +51,6 @@ const RSS_FEEDS = [
   { url: 'https://feeds.abcnews.com/abcnews/internationalheadlines', source: 'ABC', category: 'conflict' },
   
   // Wire Services
-  { url: 'https://www.reutersagency.com/feed/?best-topics=political-general&post_type=best', source: 'Reuters', category: 'conflict' },
-  { url: 'https://feeds.apnews.com/rss/apf-topnews', source: 'AP', category: 'conflict' },
-  { url: 'https://www.upi.com/rss/TopNews/', source: 'UPI', category: 'conflict' },
   
   // Major International
   { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', source: 'BBC', category: 'conflict' },
@@ -55,7 +58,7 @@ const RSS_FEEDS = [
   { url: 'https://www.theguardian.com/world/rss', source: 'Guardian', category: 'conflict' },
   { url: 'https://www.aljazeera.com/xml/rss/all.xml', source: 'Al Jazeera', category: 'conflict' },
   { url: 'https://www.france24.com/en/rss', source: 'France24', category: 'conflict' },
-  { url: 'https://www.dw.com/rss/en/top-stories/s-9097', source: 'DW', category: 'conflict' },
+  { url: 'https://rss.dw.com/rdf/rss-en-world', source: 'DW', category: 'conflict' },
   
   // Defense & Military
   { url: 'https://www.thedrive.com/the-war-zone/feed', source: 'War Zone', category: 'conflict' },
@@ -64,16 +67,14 @@ const RSS_FEEDS = [
   // Middle East
   { url: 'https://www.timesofisrael.com/feed/', source: 'Times of Israel', category: 'conflict' },
   { url: 'https://www.jpost.com/rss/rssfeedsheadlines.aspx', source: 'Jerusalem Post', category: 'conflict' },
-  { url: 'https://english.alarabiya.net/tools/rss', source: 'Al Arabiya', category: 'conflict' },
   
   // Ukraine/Russia
-  { url: 'https://kyivindependent.com/feed/', source: 'Kyiv Independent', category: 'conflict' },
+  { url: 'https://kyivindependent.com/news-archive/rss/', source: 'Kyiv Independent', category: 'conflict' },
   { url: 'https://www.pravda.com.ua/eng/rss/', source: 'Ukr Pravda', category: 'conflict' },
   { url: 'https://meduza.io/rss/en/all', source: 'Meduza', category: 'conflict' },
   
   // Asia-Pacific
   { url: 'https://www.scmp.com/rss/91/feed', source: 'SCMP', category: 'conflict' },
-  { url: 'https://www3.nhk.or.jp/nhkworld/en/news/rss/index.xml', source: 'NHK Japan', category: 'conflict' },
   { url: 'https://www.abc.net.au/news/feed/2942460/rss.xml', source: 'ABC Australia', category: 'conflict' },
   { url: 'https://www.channelnewsasia.com/rssfeeds/8395986', source: 'CNA Singapore', category: 'conflict' },
   { url: 'https://en.yna.co.kr/RSS/news.xml', source: 'Yonhap Korea', category: 'conflict' },
@@ -84,12 +85,9 @@ const RSS_FEEDS = [
   
   // OSINT & Intelligence Sources (often faster than mainstream)
   { url: 'https://www.bellingcat.com/feed/', source: 'Bellingcat', category: 'conflict' },
-  { url: 'https://www.criticalthreats.org/feed', source: 'Critical Threats', category: 'conflict' },
   { url: 'https://www.longwarjournal.org/feed', source: 'Long War Journal', category: 'conflict' },
-  { url: 'https://www.understandingwar.org/feed', source: 'ISW', category: 'conflict' },
   
   // Live Updates & Wire-style
-  { url: 'https://www.liveuamap.com/rss', source: 'LiveUAMap', category: 'conflict' },
   { url: 'https://english.aawsat.com/feed', source: 'Asharq Al-Awsat', category: 'conflict' },
   { url: 'https://www.middleeasteye.net/rss', source: 'Middle East Eye', category: 'conflict' },
   
@@ -98,17 +96,72 @@ const RSS_FEEDS = [
   { url: 'https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?max=10&ContentType=1&Site=945', source: 'DoD', category: 'conflict' },
   
   // Think Tanks & Analysis
-  { url: 'https://www.csis.org/analysis/feed', source: 'CSIS', category: 'conflict' },
   { url: 'https://www.rand.org/topics/international-affairs.xml', source: 'RAND', category: 'conflict' },
-  { url: 'https://carnegieendowment.org/rss/solr/?fa=experts', source: 'Carnegie', category: 'conflict' },
   
   // Additional Breaking News
   { url: 'https://news.google.com/rss/search?q=BREAKING+military+OR+attack+OR+war&hl=en-US&gl=US&ceid=US:en', source: 'Breaking', category: 'conflict' },
   { url: 'https://news.google.com/rss/search?q=URGENT+breaking+news&hl=en-US&gl=US&ceid=US:en', source: 'Breaking', category: 'conflict' },
   
   // Telegram-style aggregators (via RSS)
-  { url: 'https://rsshub.app/telegram/channel/inikiforov', source: 'Intel Slava', category: 'conflict' },
-  { url: 'https://rsshub.app/telegram/channel/ryaborig', source: 'Rybar', category: 'conflict' },
+
+  // ---- Global coverage ----
+  // World news as seen from other regions (Google News world section, English editions)
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-IN&gl=IN&ceid=IN:en', source: 'Breaking', category: 'world' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-PK&gl=PK&ceid=PK:en', source: 'Breaking', category: 'world' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-NG&gl=NG&ceid=NG:en', source: 'Breaking', category: 'world' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-KE&gl=KE&ceid=KE:en', source: 'Breaking', category: 'world' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-PH&gl=PH&ceid=PH:en', source: 'Breaking', category: 'world' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-SG&gl=SG&ceid=SG:en', source: 'Breaking', category: 'world' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-AU&gl=AU&ceid=AU:en', source: 'Breaking', category: 'world' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-GH&gl=GH&ceid=GH:en', source: 'Breaking', category: 'world' },
+  // Regional outlets, English
+  { url: 'https://www.dawn.com/feeds/world', source: 'Dawn', category: 'world' },
+  { url: 'https://www.thehindu.com/news/international/feeder/default.rss', source: 'The Hindu', category: 'world' },
+  { url: 'https://www.japantimes.co.jp/feed/', source: 'Japan Times', category: 'world' },
+  { url: 'https://www.taipeitimes.com/xml/index.rss', source: 'Taipei Times', category: 'world' },
+  { url: 'https://www.straitstimes.com/news/world/rss.xml', source: 'Straits Times', category: 'world' },
+  { url: 'https://www.bangkokpost.com/rss/data/world.xml', source: 'Bangkok Post', category: 'world' },
+  { url: 'https://www.rappler.com/world/feed/', source: 'Rappler', category: 'world' },
+  { url: 'https://thediplomat.com/feed/', source: 'The Diplomat', category: 'world' },
+  { url: 'https://asiatimes.com/feed/', source: 'Asia Times', category: 'world' },
+  { url: 'https://www.africanews.com/feed/rss', source: 'Africanews', category: 'world' },
+  { url: 'https://allafrica.com/tools/headlines/rdf/latest/headlines.rdf', source: 'AllAfrica', category: 'world' },
+  { url: 'https://www.premiumtimesng.com/feed', source: 'Premium Times', category: 'world' },
+  { url: 'https://www.dailymaverick.co.za/dmrss/', source: 'Daily Maverick', category: 'world' },
+  { url: 'https://en.mercopress.com/rss', source: 'MercoPress', category: 'world' },
+  { url: 'https://www.batimes.com.ar/feed', source: 'Buenos Aires Times', category: 'world' },
+  { url: 'https://www.al-monitor.com/rss', source: 'Al-Monitor', category: 'world' },
+  { url: 'https://www.tehrantimes.com/rss', source: 'Tehran Times', category: 'world' },
+  { url: 'https://www.aa.com.tr/en/rss/default?cat=world', source: 'Anadolu', category: 'world' },
+  { url: 'https://www.themoscowtimes.com/rss/news', source: 'Moscow Times', category: 'world' },
+  { url: 'https://tass.com/rss/v2.xml', source: 'TASS', category: 'world' },
+  { url: 'https://www.cgtn.com/subscribe/rss/section/world.xml', source: 'CGTN', category: 'world' },
+  { url: 'https://news.un.org/feed/subscribe/en/news/all/rss.xml', source: 'UN News', category: 'world' },
+  { url: 'https://reliefweb.int/updates/rss.xml', source: 'ReliefWeb', category: 'world' },
+  // Other languages, translated into English on the server
+  { url: 'https://feeds.bbci.co.uk/russian/rss.xml', source: 'BBC Russian', category: 'world', lang: 'ru' },
+  { url: 'https://feeds.bbci.co.uk/ukrainian/rss.xml', source: 'BBC Ukrainian', category: 'world', lang: 'uk' },
+  { url: 'https://feeds.bbci.co.uk/arabic/rss.xml', source: 'BBC Arabic', category: 'world', lang: 'ar' },
+  { url: 'https://feeds.bbci.co.uk/persian/rss.xml', source: 'BBC Persian', category: 'world', lang: 'fa' },
+  { url: 'https://feeds.bbci.co.uk/zhongwen/simp/rss.xml', source: 'BBC Chinese', category: 'world', lang: 'zh' },
+  { url: 'https://feeds.bbci.co.uk/turkce/rss.xml', source: 'BBC Turkish', category: 'world', lang: 'tr' },
+  { url: 'https://feeds.bbci.co.uk/hindi/rss.xml', source: 'BBC Hindi', category: 'world', lang: 'hi' },
+  { url: 'https://feeds.bbci.co.uk/mundo/rss.xml', source: 'BBC Mundo', category: 'world', lang: 'es' },
+  { url: 'https://feeds.bbci.co.uk/afrique/rss.xml', source: 'BBC Afrique', category: 'world', lang: 'fr' },
+  { url: 'https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/internacional/portada', source: 'El País', category: 'world', lang: 'es' },
+  { url: 'https://www.lemonde.fr/international/rss_full.xml', source: 'Le Monde', category: 'world', lang: 'fr' },
+  { url: 'https://www.spiegel.de/ausland/index.rss', source: 'Der Spiegel', category: 'world', lang: 'de' },
+  { url: 'https://www.rfi.fr/fr/monde/rss', source: 'RFI', category: 'world', lang: 'fr' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=es-419&gl=MX&ceid=MX:es', source: 'Breaking', category: 'world', lang: 'es' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=pt-BR&gl=BR&ceid=BR:pt', source: 'Breaking', category: 'world', lang: 'pt' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=ar&gl=EG&ceid=EG:ar', source: 'Breaking', category: 'world', lang: 'ar' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=ru&gl=RU&ceid=RU:ru', source: 'Breaking', category: 'world', lang: 'ru' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=uk&gl=UA&ceid=UA:uk', source: 'Breaking', category: 'world', lang: 'uk' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh', source: 'Breaking', category: 'world', lang: 'zh' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=ja&gl=JP&ceid=JP:ja', source: 'Breaking', category: 'world', lang: 'ja' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=ko&gl=KR&ceid=KR:ko', source: 'Breaking', category: 'world', lang: 'ko' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=tr&gl=TR&ceid=TR:tr', source: 'Breaking', category: 'world', lang: 'tr' },
+  { url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=id&gl=ID&ceid=ID:id', source: 'Breaking', category: 'world', lang: 'id' },
 ];
 
 const KEYWORDS_HIGH_SEVERITY = [
@@ -389,6 +442,8 @@ function extractCountry(title: string): string | undefined {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const category = searchParams.get('category') || 'all';
+  // The dashboard asks for the default page; the events route asks for everything to place on the globe.
+  const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '') || 150, 1), 600);
 
   // Return cached data if still valid
   if (newsCache && Date.now() - newsCache.timestamp < CACHE_TTL) {
@@ -397,7 +452,7 @@ export async function GET(request: Request) {
       items = items.filter(item => item.category === category);
     }
     return NextResponse.json({
-      items: items.slice(0, 50),
+      items: items.slice(0, limit),
       timestamp: new Date().toISOString(),
       count: items.length,
       cached: true,
@@ -405,7 +460,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    const feedPromises = RSS_FEEDS.map(async (feed) => {
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    // Without a translation key, non-English feeds would only add headlines nobody can read, so skip them.
+    const feeds = apiKey ? RSS_FEEDS : RSS_FEEDS.filter(f => !f.lang);
+    const feedPromises = feeds.map(async (feed) => {
       try {
         const parsed = await parser.parseURL(feed.url);
         return parsed.items.slice(0, 10).map((item, index) => {
@@ -413,7 +471,7 @@ export async function GET(request: Request) {
           let actualSource = feed.source;
           let cleanTitle = item.title || 'No title';
           
-          if (feed.source === 'Breaking' && cleanTitle.includes(' - ')) {
+          if (feed.url.includes('news.google.com') && cleanTitle.includes(' - ')) {
             const parts = cleanTitle.split(' - ');
             if (parts.length >= 2) {
               actualSource = parts[parts.length - 1].trim();
@@ -428,7 +486,8 @@ export async function GET(request: Request) {
             source: actualSource,
             category: feed.category,
             pubDate: item.pubDate || new Date().toISOString(),
-            snippet: item.contentSnippet?.substring(0, 150),
+            snippet: feed.lang ? undefined : item.contentSnippet?.substring(0, 150),
+            lang: feed.lang,
             country: extractCountry(cleanTitle),
             severity: determineSeverity(cleanTitle),
           };
@@ -441,6 +500,18 @@ export async function GET(request: Request) {
 
     const results = await Promise.all(feedPromises);
     let allItems: NewsItem[] = results.flat();
+
+    // Translate non-English headlines, then score them like any English headline.
+    const foreign = allItems.filter(i => i.lang);
+    if (foreign.length) {
+      const english = await translateToEnglish(foreign.map(i => i.title), apiKey);
+      allItems = allItems.flatMap(item => {
+        if (!item.lang) return [item];
+        const title = english.get(item.title);
+        if (!title) return [];
+        return [{ ...item, title, originalTitle: item.title, country: extractCountry(title), severity: determineSeverity(title) }];
+      });
+    }
 
     // Group similar articles instead of removing them
     const getWords = (title: string): Set<string> => {
@@ -521,10 +592,9 @@ export async function GET(request: Request) {
       // Exclude entertainment/sports URLs
       const url = (item.link || '').toLowerCase();
       if (url.includes('/entertainment') || url.includes('/sport') || url.includes('/lifestyle')) return false;
-      // MUST have urgent keyword - this is the key filter
-      if (!isUrgent(item.title)) return false;
-      // Also must match priority keywords
-      return isPriority(item.title) || item.severity === 'critical' || item.severity === 'high';
+      // Keep anything geopolitical (priority keywords) or anything scored high or critical.
+      // Urgent wording alone is no longer required, which kept most global coverage out.
+      return isPriority(item.title) || isUrgent(item.title) && item.severity !== 'low' || item.severity === 'critical' || item.severity === 'high';
     });
 
     // Filter by category if specified
@@ -546,9 +616,10 @@ export async function GET(request: Request) {
     };
 
     return NextResponse.json({
-      items: allItems.slice(0, 50),
+      items: allItems.slice(0, limit),
       timestamp: new Date().toISOString(),
       count: allItems.length,
+      sources: new Set(allItems.map(i => i.source)).size,
       cached: false,
     });
   } catch (error) {

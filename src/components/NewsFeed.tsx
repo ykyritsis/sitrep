@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { NewsItem } from '@/types';
 import { useFeed } from '@/lib/use-feed';
 import FeedHeader from './FeedHeader';
+import { LANGUAGE_NAMES } from '@/lib/languages';
 
 export default function NewsFeed({category = 'all', limit, onMore}: {category?: string; limit?: number; onMore?: () => void}) {
   const {items, loading, error, updated, refresh} = useFeed<NewsItem>('/api/news?category=' + encodeURIComponent(category), 'items', 60000);
@@ -61,7 +62,7 @@ export default function NewsFeed({category = 'all', limit, onMore}: {category?: 
           <div className="story-meta"><span>{item.source}</span><time dateTime={Number.isNaN(date.getTime()) ? undefined : date.toISOString()}>{Number.isNaN(date.getTime()) ? 'Time unavailable' : formatDistanceToNow(date, {addSuffix:true})}</time></div>
           <a className="story-title" href={item.link} target="_blank" rel="noopener noreferrer">{item.title}<ArrowUpRight size={13}/></a>
           {greek && translations[item.id] && <p className="story-translation" lang="el">{translations[item.id]}</p>}
-          <div className="story-tags">{item.country && <span>{item.country}</span>}{item.severity && ['critical','high'].includes(item.severity) && <span className={'severity ' + item.severity}>{item.severity}</span>}</div>
+          <div className="story-tags">{item.lang && <span className="story-lang" title={item.originalTitle}>Translated from {LANGUAGE_NAMES[item.lang] || item.lang}</span>}{item.country && <span>{item.country}</span>}{item.severity && ['critical','high'].includes(item.severity) && <span className={'severity ' + item.severity}>{item.severity}</span>}</div>
           {!!item.relatedArticles?.length && <><button className="related-toggle" aria-expanded={expanded === item.id} onClick={() => setExpanded(expanded === item.id ? null : item.id)}>{item.relatedArticles.length} more sources <ChevronDown size={12}/></button>
           {expanded === item.id && <div className="related-list">{item.relatedArticles.map((article,i) => <a key={article.link + i} href={article.link} target="_blank" rel="noopener noreferrer"><span>{article.source}</span>{article.title}</a>)}</div>}</>}
         </article>;

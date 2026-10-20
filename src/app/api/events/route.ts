@@ -111,7 +111,9 @@ interface GlobeEvent {
   region: string;
 }
 
-export async function GET() {
+export const maxDuration = 60;
+
+export async function GET(request: Request) {
   try {
     const feedPromises = EVENT_FEEDS.map(async (feed) => {
       try {
@@ -129,8 +131,15 @@ export async function GET() {
       }
     });
 
-    const results = await Promise.all(feedPromises);
-    const allItems = results.flat();
+    // Every story from the news route too: global and translated sources, already filtered for relevance.
+    const newsPromise = fetch(new URL('/api/news?limit=600', request.url), { cache: 'no-store', signal: AbortSignal.timeout(50000) })
+      .then(r => r.ok ? r.json() : { items: [] })
+      .then((d: { items?: { title: string; link: string; pubDate: string; snippet?: string; source: string }[] }) =>
+        (d.items || []).map(i => ({ title: i.title, link: i.link, pubDate: i.pubDate, snippet: i.snippet || '', source: i.source })))
+      .catch(() => []);
+    const [results, newsItems] = await Promise.all([Promise.all(feedPromises), newsPromise]);
+    const seenLinks = new Set<string>();
+    const allItems = [...results.flat(), ...newsItems].filter(i => !seenLinks.has(i.link) && seenLinks.add(i.link));
 
     // Extract events with locations
     const events: GlobeEvent[] = [];
@@ -201,7 +210,7 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      events: events.slice(0, 400),
+      events: events.slice(0, 900),
       timestamp: new Date().toISOString(),
       count: events.length,
     });

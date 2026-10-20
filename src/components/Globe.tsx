@@ -8,15 +8,13 @@ import type { GlobeMethods } from 'react-globe.gl';
 import { Pause, Play, RotateCcw, X, ArrowUpRight } from 'lucide-react';
 import { useEvents, type MapEvent } from '@/lib/use-events';
 import { eventTypeConfig, type EventCategory } from '@/lib/event-types';
+import { mapTexture } from '@/lib/globe-texture';
+import { createMarkerLayer, setMarkers, pickMarker, type MarkerLayer } from '@/lib/globe-markers';
 
 const GlobeGL = dynamic(() => import('react-globe.gl'), { ssr: false });
 
-// URL for country borders GeoJSON
-const COUNTRIES_URL = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson';
-
 interface GlobeProps {
   hotspots: HotspotData[];
-  onHotspotClick?: (hotspot: HotspotData) => void;
   onEventClick?: (event: MapEvent) => void;
 }
 
@@ -33,53 +31,86 @@ const LAYERS: { id: 'all' | EventCategory; label: string }[] = [
   { id: 'hazard', label: 'Hazards' },
 ];
 
-// Flat, light map: pale ocean, white land, slate borders.
-const OCEAN = '#d6e5f1';
-const LAND = '#fbfcfd';
+const HOME = { lat: 25, lng: 40, altitude: 1.95 };
+const MARKER_ALTITUDE = 0.012;
+const MAX_PIXEL_RATIO = 1.5;
+const SIZE = { low: 8, medium: 10, high: 12, critical: 15 } as const;
 
-export default function Globe({ onHotspotClick, onEventClick }: GlobeProps) {
+export default function Globe({ onEventClick }: GlobeProps) {
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const container = useRef<HTMLDivElement>(null);
-  const [size,setSize] = useState({width:0,height:0});
-  const [rotating,setRotating] = useState(false);
-  useEffect(() => {
-    if (!container.current) return;
-    const observer = new ResizeObserver(([entry]) => setSize({width:Math.floor(entry.contentRect.width),height:Math.floor(entry.contentRect.height)}));
-    observer.observe(container.current);
-    return () => observer.disconnect();
-  },[]);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<MarkerLayer | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const [rotating, setRotating] = useState(false);
   const [globeReady, setGlobeReady] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
+  const [hovered, setHovered] = useState<MapEvent | null>(null);
   const [layer, setLayer] = useState<'all' | EventCategory>('all');
-  const {items:allEvents,loading,error,counts} = useEvents();
+  const { items: allEvents, loading, error, counts } = useEvents();
   const liveEvents = useMemo(() => layer === 'all' ? allEvents : allEvents.filter(e => e.category === layer), [allEvents, layer]);
-  const [countries, setCountries] = useState<{features:object[]}>({ features: [] });
-  const oceanMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: OCEAN }), []);
-  const landMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: LAND }), []);
 
-  // Fetch country borders GeoJSON
+  // Flat ocean colour until the map texture is ready; MeshBasicMaterial needs no lighting.
+  const globeMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: '#d6e5f1' }), []);
+
   useEffect(() => {
-    fetch(COUNTRIES_URL)
-      .then(res => res.json())
-      .then(data => setCountries(data))
-      .catch(err => console.error('Failed to load countries:', err));
+    if (!container.current) return;
+    const observer = new ResizeObserver(([entry]) => setSize({ width: Math.floor(entry.contentRect.width), height: Math.floor(entry.contentRect.height) }));
+    observer.observe(container.current);
+    return () => observer.disconnect();
   }, []);
 
+  // Renderer setup, map texture and the marker layer, once the globe exists.
   useEffect(() => {
-    if (globeRef.current && globeReady) {
-      globeRef.current.controls().autoRotate = false;
-      globeRef.current.controls().autoRotateSpeed = 0.05;
-      globeRef.current.pointOfView({ lat: 25, lng: 40, altitude: 1.95 });
-    }
-  }, [globeReady]);
+    const g = globeRef.current;
+    if (!g || !globeReady) return;
+    const renderer = g.renderer();
+    const ratio = Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO);
+    renderer.setPixelRatio(ratio);
+    g.controls().autoRotateSpeed = 0.35;
+    g.pointOfView(HOME);
 
-  useEffect(() => { if (globeRef.current && globeReady) globeRef.current.controls().autoRotate = rotating; },[rotating,globeReady]);
+    const width = Math.min(renderer.capabilities.maxTextureSize, (container.current?.clientWidth || 0) < 700 ? 2048 : 4096);
+    let cancelled = false;
+    mapTexture(width, renderer.capabilities.getMaxAnisotropy()).then(tex => {
+      if (cancelled) return;
+      globeMaterial.color.set('#ffffff');
+      globeMaterial.map = tex;
+      globeMaterial.needsUpdate = true;
+    });
 
-  // Marker size reflects severity, so the biggest markers are the ones that matter.
-  const eventPoints = useMemo(() => liveEvents.map((e) => {
-    const base = { low: 8, medium: 10, high: 12, critical: 15 }[e.severity] ?? 8;
-    return { ...e, px: e.category === 'hazard' ? base + 2 : base, color: eventTypeConfig[e.type]?.color || '#0aa5bc' };
-  }), [liveEvents]);
+    const markers = layerRef.current ?? (layerRef.current = createMarkerLayer());
+    markers.uniforms.uPixelRatio.value = ratio;
+    g.scene().add(markers.points);
+
+    // Stop rendering entirely while the globe is scrolled out of view.
+    const visibility = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) g.resumeAnimation(); else g.pauseAnimation(); });
+    if (container.current) visibility.observe(container.current);
+    return () => { cancelled = true; visibility.disconnect(); markers.points.removeFromParent(); };
+  }, [globeReady, globeMaterial]);
+
+  useEffect(() => () => { layerRef.current?.dispose(); globeMaterial.dispose(); }, [globeMaterial]);
+
+  useEffect(() => { if (globeRef.current && globeReady) globeRef.current.controls().autoRotate = rotating; }, [rotating, globeReady]);
+
+  // Push the current events into the GPU buffers whenever they change.
+  useEffect(() => {
+    const g = globeRef.current, markers = layerRef.current;
+    if (!g || !globeReady || !markers) return;
+    setMarkers(markers, liveEvents.map(e => ({
+      lat: e.lat, lng: e.lng,
+      color: eventTypeConfig[e.type]?.color || '#0aa5bc',
+      size: (SIZE[e.severity] ?? 8) + (e.category === 'hazard' ? 2 : 0),
+      hazard: e.category === 'hazard',
+      critical: e.severity === 'critical',
+    })), (lat, lng) => g.getCoords(lat, lng, MARKER_ALTITUDE));
+    markers.uniforms.uHover.value = -1;
+  }, [liveEvents, globeReady]);
+
+  useEffect(() => {
+    const markers = layerRef.current;
+    if (markers) markers.uniforms.uSelected.value = selectedEvent ? liveEvents.indexOf(selectedEvent) : -1;
+  }, [selectedEvent, liveEvents]);
 
   // Legend: the event types currently on the map, most common first
   const legend = useMemo(() => {
@@ -88,96 +119,69 @@ export default function Globe({ onHotspotClick, onEventClick }: GlobeProps) {
     return Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, 6);
   }, [liveEvents]);
 
-  // Country labels for major hotspots
-  const countryLabels = useMemo(() => [
-    { lat: 48.5, lng: 31.0, label: 'UKRAINE' },
-    { lat: 60.0, lng: 100.0, label: 'RUSSIA' },
-    { lat: 32.5, lng: 53.0, label: 'IRAN' },
-    { lat: 31.0, lng: 35.0, label: 'ISRAEL' },
-    { lat: 35.0, lng: 105.0, label: 'CHINA' },
-    { lat: 23.5, lng: 121.0, label: 'TAIWAN' },
-    { lat: 40.0, lng: 127.0, label: 'DPRK' },
-    { lat: 15.5, lng: 47.5, label: 'YEMEN' },
-    { lat: 35.0, lng: 38.5, label: 'SYRIA' },
-  ], []);
+  const pickAt = useCallback((clientX: number, clientY: number) => {
+    const g = globeRef.current, markers = layerRef.current;
+    if (!g || !markers) return -1;
+    const rect = g.renderer().domElement.getBoundingClientRect();
+    return pickMarker(markers, g.camera(), rect.width, rect.height, clientX - rect.left, clientY - rect.top);
+  }, []);
 
-  const handlePointClick = useCallback((data: object) => {
-    const point = data as MapEvent;
-    setSelectedEvent(point);
-    if (onEventClick) onEventClick(point);
-    if (globeRef.current) {
-      globeRef.current.pointOfView({ lat: point.lat, lng: point.lng, altitude: 1.5 }, 1000);
-    }
-  }, [onEventClick]);
-  void onHotspotClick;
+  // Hover (mouse only), throttled to one hit test per frame
+  const frame = useRef(0);
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType !== 'mouse' || e.buttons) return;
+    const { clientX, clientY } = e;
+    cancelAnimationFrame(frame.current);
+    frame.current = requestAnimationFrame(() => {
+      const i = pickAt(clientX, clientY);
+      const markers = layerRef.current;
+      if (markers) markers.uniforms.uHover.value = i;
+      if (container.current) container.current.style.cursor = i >= 0 ? 'pointer' : '';
+      setHovered(i >= 0 ? liveEvents[i] : null);
+      const rect = container.current?.getBoundingClientRect();
+      if (tipRef.current && rect) tipRef.current.style.transform = `translate(${clientX - rect.left}px, ${clientY - rect.top}px)`;
+    });
+  }, [pickAt, liveEvents]);
 
-  // Each event is a small DOM marker: filled dot for conflict, ring for natural hazards,
-  // with a hover card. Text is set with textContent, so feed content is never parsed as HTML.
-  const makeMarker = useCallback((data: object) => {
-    const d = data as MapEvent & { px: number; color: string };
-    const el = document.createElement('button');
-    el.type = 'button';
-    el.className = `gm gm-${d.category} gm-${d.severity}`;
-    el.dataset.id = d.id;
-    el.style.setProperty('--c', d.color);
-    el.style.setProperty('--s', d.px + 'px');
-    el.setAttribute('aria-label', d.title);
-    const tip = document.createElement('span');
-    tip.className = 'gm-tip';
-    const kind = document.createElement('b');
-    kind.textContent = (eventTypeConfig[d.type]?.label || 'Event').toLowerCase();
-    const title = document.createElement('span');
-    title.textContent = d.title;
-    tip.append(kind, title);
-    el.append(tip);
-    el.addEventListener('click', (ev) => { ev.stopPropagation(); handlePointClick(d); });
-    return el;
-  }, [handlePointClick]);
+  const onPointerLeave = useCallback(() => {
+    cancelAnimationFrame(frame.current);
+    if (layerRef.current) layerRef.current.uniforms.uHover.value = -1;
+    setHovered(null);
+  }, []);
 
-  // Highlight the selected marker without rebuilding all of them
-  useEffect(() => {
-    const root = container.current;
-    if (!root) return;
-    root.querySelectorAll('.gm.is-selected').forEach(n => n.classList.remove('is-selected'));
-    if (selectedEvent) root.querySelector(`.gm[data-id="${CSS.escape(selectedEvent.id)}"]`)?.classList.add('is-selected');
-  }, [selectedEvent, eventPoints]);
+  // Click or tap (not a drag) selects the nearest marker and flies to it
+  const down = useRef({ x: 0, y: 0 });
+  const onPointerDown = useCallback((e: React.PointerEvent) => { down.current = { x: e.clientX, y: e.clientY }; }, []);
+  const onPointerUp = useCallback((e: React.PointerEvent) => {
+    if (Math.hypot(e.clientX - down.current.x, e.clientY - down.current.y) > 6) return;
+    if ((e.target as HTMLElement).closest('button, a, .selected-event, .event-legend')) return;
+    const i = pickAt(e.clientX, e.clientY);
+    if (i < 0) return;
+    const ev = liveEvents[i];
+    setSelectedEvent(ev);
+    setHovered(null);
+    onEventClick?.(ev);
+    globeRef.current?.pointOfView({ lat: ev.lat, lng: ev.lng, altitude: 1.5 }, 1000);
+  }, [pickAt, liveEvents, onEventClick]);
+
+  const onZoom = useCallback((pov: { altitude: number }) => {
+    // Markers grow a little as you zoom in, so dense areas separate.
+    if (layerRef.current) layerRef.current.uniforms.uScale.value = Math.min(1.6, Math.max(0.85, Math.pow(HOME.altitude / pov.altitude, 0.35)));
+  }, []);
 
   return (
-    <div ref={container} className="globe-root">
+    <div ref={container} className="globe-root" onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
       {size.width > 0 && size.height > 0 && <div className="globe-canvas"><GlobeGL
+        ref={globeRef}
         width={size.width}
         height={size.height}
         backgroundColor="rgba(0,0,0,0)"
-        ref={globeRef}
-        globeMaterial={oceanMaterial}
-        // Country polygons for borders: white land on pale ocean
-        polygonsData={countries.features}
-        polygonCapMaterial={landMaterial}
-        polygonSideColor={() => 'rgba(100, 116, 139, 0.12)'}
-        polygonStrokeColor={() => 'rgba(100, 116, 139, 0.45)'}
-        polygonAltitude={0.006}
-        // Event markers (DOM elements, hidden when on the far side of the globe)
-        htmlElementsData={eventPoints}
-        htmlLat="lat"
-        htmlLng="lng"
-        htmlAltitude={0.01}
-        htmlElement={makeMarker}
-        htmlElementVisibilityModifier={(el, visible) => { el.style.opacity = visible ? '1' : '0'; el.style.pointerEvents = visible ? 'auto' : 'none'; }}
-        htmlTransitionDuration={0}
-        // Labels for key countries
-        labelsData={countryLabels}
-        labelLat="lat"
-        labelLng="lng"
-        labelText="label"
-        labelSize={0.5}
-        labelDotRadius={0}
-        labelColor={() => 'rgba(51, 65, 85, 0.55)'}
-        labelResolution={2}
-        labelAltitude={0.008}
-        labelIncludeDot={false}
-        // Soft blue atmosphere
+        rendererConfig={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+        globeMaterial={globeMaterial}
+        showGraticules={false}
         atmosphereColor="#7cc4e4"
         atmosphereAltitude={0.14}
+        onZoom={onZoom}
         onGlobeReady={() => setGlobeReady(true)}
       /></div>}
 
@@ -194,11 +198,19 @@ export default function Globe({ onHotspotClick, onEventClick }: GlobeProps) {
         <WorldClock timezone="Asia/Tokyo" label="TYO" />
       </div>
 
+      <div ref={tipRef} className={'globe-tip' + (hovered ? ' is-visible' : '')} aria-hidden="true">
+        {hovered && <div style={{ '--c': eventTypeConfig[hovered.type]?.color || '#0aa5bc' } as React.CSSProperties}>
+          <b>{(eventTypeConfig[hovered.type]?.label || 'Event').toLowerCase()}</b>
+          <span>{hovered.title}</span>
+          <small>{hovered.source}{hovered.magnitude ? ' · ' + hovered.magnitude : ''}</small>
+        </div>}
+      </div>
+
       <div className="event-legend">
         <div className="event-legend-items">
           {legend.map(([type, n]) => (
             <div key={type}>
-              <i style={{ backgroundColor: eventTypeConfig[type]?.color || '#94a3b8' }} />
+              <i className={eventTypeConfig[type]?.category === 'hazard' ? 'is-ring' : undefined} style={{ '--c': eventTypeConfig[type]?.color || '#94a3b8' } as React.CSSProperties} />
               <span>{(eventTypeConfig[type]?.label || type).toLowerCase()}</span><b>{n}</b>
             </div>
           ))}
@@ -238,8 +250,8 @@ export default function Globe({ onHotspotClick, onEventClick }: GlobeProps) {
 
       <div className="globe-tools">
         <div className="globe-tool-buttons">
-          <button className="icon-button" aria-label={rotating ? 'Pause globe rotation':'Rotate globe'} aria-pressed={rotating} onClick={() => setRotating(!rotating)}>{rotating ? <Pause size={14}/> : <Play size={14}/>}</button>
-          <button className="icon-button" aria-label="Reset globe view" onClick={() => { globeRef.current?.pointOfView({lat:25,lng:40,altitude:1.95},800); setSelectedEvent(null); }}><RotateCcw size={14}/></button>
+          <button className="icon-button" aria-label={rotating ? 'Pause globe rotation' : 'Rotate globe'} aria-pressed={rotating} onClick={() => setRotating(!rotating)}>{rotating ? <Pause size={14} /> : <Play size={14} />}</button>
+          <button className="icon-button" aria-label="Reset globe view" onClick={() => { globeRef.current?.pointOfView(HOME, 800); setSelectedEvent(null); }}><RotateCcw size={14} /></button>
         </div>
         <span className="event-count" role="status">{error ? 'Events unavailable' : loading && !liveEvents.length ? 'Loading events…' : liveEvents.length + ' events'}</span>
       </div>
@@ -252,17 +264,11 @@ function WorldClock({ timezone, label }: { timezone: string; label: string }) {
 
   useEffect(() => {
     const updateTime = () => {
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', {
-        timeZone: timezone,
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
-      setTime(timeStr);
+      setTime(new Date().toLocaleTimeString('en-US', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false }));
     };
     updateTime();
-    const interval = setInterval(updateTime, 1000);
+    // Minutes are all a clock face needs; ticking every second would re-render for nothing.
+    const interval = setInterval(updateTime, 15000);
     return () => clearInterval(interval);
   }, [timezone]);
 

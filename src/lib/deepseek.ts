@@ -1,9 +1,10 @@
 // Server-side only. Calls DeepSeek's chat API and returns parsed JSON.
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
 
-export async function deepseekJson<T>(prompt: string, apiKey: string, maxTokens = 600): Promise<T> {
+export async function deepseekJson<T>(prompt: string, apiKey: string, maxTokens = 600, timeoutMs = 45000): Promise<T> {
   const res = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
+    signal: AbortSignal.timeout(timeoutMs),
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: DEEPSEEK_MODEL,

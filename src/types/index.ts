@@ -17,6 +17,9 @@ export interface NewsItem {
   coordinates?: [number, number];
   severity?: 'low' | 'medium' | 'high' | 'critical';
   relatedArticles?: RelatedArticle[];
+  // Set when the headline was machine-translated from another language
+  lang?: string;
+  originalTitle?: string;
 }
 
 export interface HotspotData {
